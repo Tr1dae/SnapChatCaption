@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Image with Caption</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: 'AvenirLTPro-Light', Arial, sans-serif;
+      font-size: 2rem;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      background-color: #f0f0f0;
+    }
+
+    .container {
+      position: relative;
+      max-width: 100%;
+      max-height: 100vh;
+      overflow: hidden;
+    }
+
+    #image {
+      display: block;
+      max-width: 100%;
+      max-height: 90vh;
+      width: auto;
+      height: auto;
+      cursor: pointer;
+    }
+
+    .caption-container {
+      position: absolute;
+      left: 0;
+      width: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      color: white;
+      text-align: center;
+      padding: 10px 0;
+      cursor: grab;
+      user-select: none;
+      white-space: nowrap;
+      bottom: 0;
+      font-family: 'AvenirLTPro-Light', Arial, sans-serif;
+      font-size: 24px;
+    }
+
+    .caption-container:active {
+      cursor: grabbing;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Image container -->
+    <img id="image" src="" alt="Loaded Image">
+
+    <!-- Caption container -->
+    <div class="caption-container" id="caption-box">
+      <span id="caption-text">Caption here</span>
+    </div>
+  </div>
+
+  <!-- Hidden canvas for screenshot -->
+  <canvas id="screenshot-canvas" style="display: none;"></canvas>
+
+  <!-- FileSaver.js library -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+
+  <script>
+    // Automatically trigger the file input dialog on page load
+    window.addEventListener('load', function () {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.style.display = 'none';
+
+      input.addEventListener('change', function (event) {
+        const file = event.target.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = function (e) {
+            image.src = e.target.result;
+
+            // Ensure the caption box is visible after loading a new image
+            captionBox.style.bottom = '0';
+            captionBox.style.top = 'auto';
+          };
+          reader.readAsDataURL(file);
+        }
+      });
+
+      document.body.appendChild(input);
+      input.click();
+      document.body.removeChild(input);
+    });
+
+    // Load image when the image is clicked
+    const image = document.getElementById('image');
+    const captionBox = document.getElementById('caption-box');
+
+    image.addEventListener('click', function () {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.style.display = 'none';
+
+      input.addEventListener('change', function (event) {
+        const file = event.target.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = function (e) {
+            image.src = e.target.result;
+
+            // Ensure the caption box is visible after loading a new image
+            captionBox.style.bottom = '0';
+            captionBox.style.top = 'auto';
+          };
+          reader.readAsDataURL(file);
+        }
+      });
+
+      document.body.appendChild(input);
+      input.click();
+      document.body.removeChild(input);
+    });
+
+    // Make caption box draggable vertically
+    const captionText = document.getElementById('caption-text');
+    let isDragging = false;
+    let startY, startTop;
+
+    captionBox.addEventListener('mousedown', function (event) {
+      if (event.button === 0) { // Left click
+        isDragging = true;
+        startY = event.clientY;
+        startTop = captionBox.offsetTop;
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+      }
+    });
+
+    function onMouseMove(event) {
+      if (isDragging) {
+        const deltaY = event.clientY - startY;
+        const newTop = startTop + deltaY;
+
+        // Constrain the caption box within the image bounds
+        const imageHeight = image.clientHeight;
+        const captionHeight = captionBox.clientHeight;
+        const maxTop = imageHeight - captionHeight;
+
+        if (newTop >= 0 && newTop <= maxTop) {
+          captionBox.style.top = `${newTop}px`;
+          captionBox.style.bottom = 'auto';
+        }
+      }
+    }
+
+    function onMouseUp() {
+      isDragging = false;
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    }
+
+    // Right-click to edit caption text
+    captionBox.addEventListener('contextmenu', function (event) {
+      event.preventDefault();
+
+      const text = captionText.innerText;
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.value = text;
+      input.style.position = 'absolute';
+      input.style.left = '50%';
+      input.style.transform = 'translateX(-50%)';
+      input.style.textAlign = 'center';
+      input.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
+      input.style.color = 'white';
+      input.style.border = 'none';
+      input.style.outline = 'none';
+      input.style.padding = '5px 10px';
+
+      captionBox.replaceChild(input, captionText);
+      input.focus();
+
+      input.addEventListener('blur', function () {
+        captionText.innerText = input.value;
+        captionBox.replaceChild(captionText, input);
+      });
+
+      input.addEventListener('keypress', function (event) {
+        if (event.key === 'Enter') {
+          captionText.innerText = input.value;
+          captionBox.replaceChild(captionText, input);
+        }
+      });
+    });
+
+    // Function to take a screenshot
+    function takeScreenshot() {
+      const canvas = document.getElementById('screenshot-canvas');
+      const ctx = canvas.getContext('2d');
+
+      // Set canvas dimensions to match the image
+      canvas.width = image.width;
+      canvas.height = image.height;
+
+      // Draw the image onto the canvas
+      ctx.drawImage(image, 0, 0, image.width, image.height);
+
+      // Draw the caption box onto the canvas
+      const captionStyle = window.getComputedStyle(captionBox);
+      ctx.fillStyle = captionStyle.backgroundColor;
+      ctx.fillRect(0, captionBox.offsetTop, canvas.width, captionBox.offsetHeight);
+
+      // Draw the caption text onto the canvas
+      ctx.font = `${captionStyle.fontSize} ${captionStyle.fontFamily}`;
+      ctx.fillStyle = captionStyle.color;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      ctx.fillText(
+        captionBox.innerText,
+        canvas.width / 2,
+        captionBox.offsetTop + parseFloat(captionStyle.paddingTop)
+      );
+
+      // Save the canvas as an image
+      canvas.toBlob(function (blob) {
+        saveAs(blob, 'screenshot.png');
+      });
+    }
+
+    // Add keyboard shortcut for "X"
+    document.addEventListener('keydown', function (event) {
+      if (event.key === 'x' || event.key === 'X') {
+        takeScreenshot();
+      }
+    });
+  </script>
+</body>
+</html>
