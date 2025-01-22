@@ -7,7 +7,8 @@
   <style>
     body {
       margin: 0;
-      font-family: 'AvenirLTPro-Light', Arial, sans-serif;
+      font-family: 'AvenirLTPro-Light';
+      src: url('fonts/AvenirLTProLight.otf') format('opentype');
       font-size: 2rem;
       display: flex;
       justify-content: center;
@@ -42,26 +43,53 @@
       padding: 10px 0;
       cursor: grab;
       user-select: none;
-      white-space: nowrap;
       bottom: 0;
       font-family: 'AvenirLTPro-Light', Arial, sans-serif;
       font-size: 24px;
+      word-wrap: break-word;
+      white-space: normal;
+      max-width: 100%;
+      box-sizing: border-box;
     }
 
     .caption-container:active {
       cursor: grabbing;
+    }
+
+    #caption-text {
+      display: inline-block;
+      max-width: 100%;
+      word-wrap: break-word;
+    }
+
+    #load-image-button {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      padding: 15px 30px;
+      font-size: 20px;
+      cursor: pointer;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      z-index: 10;
     }
   </style>
 </head>
 <body>
   <div class="container">
     <!-- Image container -->
-    <img id="image" src="" alt="Loaded Image">
+    <img id="image" src="" alt="...............................">
 
     <!-- Caption container -->
     <div class="caption-container" id="caption-box">
-      <span id="caption-text">Refresh to load image. Right click to edit caption. Press 'X' to screenshot. </span>
+      <span id="caption-text">Right click to edit. Drag to move. X to screenshot</span>
     </div>
+
+    <!-- Load Image Button -->
+    <button id="load-image-button">Load</button>
   </div>
 
   <!-- Hidden canvas for screenshot -->
@@ -71,8 +99,8 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 
   <script>
-    // Automatically trigger the file input dialog on page load
-    window.addEventListener('load', function () {
+    // Function to load image
+    function loadImage() {
       const input = document.createElement('input');
       input.type = 'file';
       input.accept = 'image/*';
@@ -84,10 +112,9 @@
           const reader = new FileReader();
           reader.onload = function (e) {
             image.src = e.target.result;
-
-            // Ensure the caption box is visible after loading a new image
             captionBox.style.bottom = '0';
             captionBox.style.top = 'auto';
+            loadImageButton.style.display = 'none'; // Hide button after loading image
           };
           reader.readAsDataURL(file);
         }
@@ -96,45 +123,20 @@
       document.body.appendChild(input);
       input.click();
       document.body.removeChild(input);
-    });
+    }
 
-    // Load image when the image is clicked
     const image = document.getElementById('image');
     const captionBox = document.getElementById('caption-box');
-
-    image.addEventListener('click', function () {
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = 'image/*';
-      input.style.display = 'none';
-
-      input.addEventListener('change', function (event) {
-        const file = event.target.files[0];
-        if (file) {
-          const reader = new FileReader();
-          reader.onload = function (e) {
-            image.src = e.target.result;
-
-            // Ensure the caption box is visible after loading a new image
-            captionBox.style.bottom = '0';
-            captionBox.style.top = 'auto';
-          };
-          reader.readAsDataURL(file);
-        }
-      });
-
-      document.body.appendChild(input);
-      input.click();
-      document.body.removeChild(input);
-    });
-
-    // Make caption box draggable vertically
     const captionText = document.getElementById('caption-text');
+    const loadImageButton = document.getElementById('load-image-button');
+
+    loadImageButton.addEventListener('click', loadImage);
+
     let isDragging = false;
     let startY, startTop;
 
     captionBox.addEventListener('mousedown', function (event) {
-      if (event.button === 0) { // Left click
+      if (event.button === 0) {
         isDragging = true;
         startY = event.clientY;
         startTop = captionBox.offsetTop;
@@ -148,7 +150,6 @@
         const deltaY = event.clientY - startY;
         const newTop = startTop + deltaY;
 
-        // Constrain the caption box within the image bounds
         const imageHeight = image.clientHeight;
         const captionHeight = captionBox.clientHeight;
         const maxTop = imageHeight - captionHeight;
@@ -166,7 +167,6 @@
       document.removeEventListener('mouseup', onMouseUp);
     }
 
-    // Right-click to edit caption text
     captionBox.addEventListener('contextmenu', function (event) {
       event.preventDefault();
 
@@ -200,41 +200,58 @@
       });
     });
 
-    // Function to take a screenshot
     function takeScreenshot() {
       const canvas = document.getElementById('screenshot-canvas');
       const ctx = canvas.getContext('2d');
 
-      // Set canvas dimensions to match the image
       canvas.width = image.width;
       canvas.height = image.height;
 
-      // Draw the image onto the canvas
       ctx.drawImage(image, 0, 0, image.width, image.height);
 
-      // Draw the caption box onto the canvas
       const captionStyle = window.getComputedStyle(captionBox);
       ctx.fillStyle = captionStyle.backgroundColor;
       ctx.fillRect(0, captionBox.offsetTop, canvas.width, captionBox.offsetHeight);
 
-      // Draw the caption text onto the canvas
+      const text = captionText.innerText;
+      const maxWidth = canvas.width - 40;
+      const lineHeight = 30;
+      const x = canvas.width / 2;
+      let y = captionBox.offsetTop + parseFloat(captionStyle.paddingTop);
+
       ctx.font = `${captionStyle.fontSize} ${captionStyle.fontFamily}`;
       ctx.fillStyle = captionStyle.color;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'top';
-      ctx.fillText(
-        captionBox.innerText,
-        canvas.width / 2,
-        captionBox.offsetTop + parseFloat(captionStyle.paddingTop)
-      );
 
-      // Save the canvas as an image
+      function wrapText(context, text, x, y, maxWidth, lineHeight) {
+        const words = text.split(' ');
+        let line = '';
+
+        for (let i = 0; i < words.length; i++) {
+          const testLine = line + words[i] + ' ';
+          const metrics = context.measureText(testLine);
+          const testWidth = metrics.width;
+
+          if (testWidth > maxWidth && i > 0) {
+            context.fillText(line, x, y);
+            line = words[i] + ' ';
+            y += lineHeight;
+          } else {
+            line = testLine;
+          }
+        }
+
+        context.fillText(line, x, y);
+      }
+
+      wrapText(ctx, text, x, y, maxWidth, lineHeight);
+
       canvas.toBlob(function (blob) {
         saveAs(blob, 'screenshot.png');
       });
     }
 
-    // Add keyboard shortcut for "X"
     document.addEventListener('keydown', function (event) {
       if (event.key === 'x' || event.key === 'X') {
         takeScreenshot();
